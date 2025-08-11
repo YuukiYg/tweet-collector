@@ -34,15 +34,30 @@ function extractTweetData(node) {
     node.querySelector('a[href*="/analytics"]') ||
     node.querySelector('[data-testid="app-text-transition-container"]');
 
+  // 日本時間に変換
+  let japanTime = "";
+  if (timeElement?.getAttribute("datetime")) {
+    const date = new Date(timeElement.getAttribute("datetime"));
+    japanTime = date.toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
   return {
-    datetime: timeElement?.getAttribute("datetime") || "",
+    datetime: japanTime,
     likes: extractCount(likeElement),
     retweets: extractCount(retweetElement),
     replies: extractCount(replyElement),
     views: extractCount(viewElement) || 0,
     bookmarks: extractCount(bookmarkElement),
-    text: textElement?.innerText || "",
     id: tweetId,
+    text: textElement?.innerText || "",
     url: tweetLink.href,
     timestamp: new Date().toISOString(),
   };
@@ -67,7 +82,7 @@ const observer = new MutationObserver((mutations) => {
 // 監視開始
 observer.observe(document.body, { childList: true, subtree: true });
 
-// CSVファイルとしてダウンロード（修正版）
+// CSVファイルとしてダウンロード
 function downloadTweetsCSV() {
   if (tweets.length === 0) {
     console.log("ダウンロードするデータがありません");
@@ -81,6 +96,7 @@ function downloadTweetsCSV() {
     "リプ数",
     "インプ数",
     "ブックマーク数",
+    "ID",
     "投稿内容",
   ];
   const csvRows = [headers.join(",")];
@@ -91,12 +107,13 @@ function downloadTweetsCSV() {
       .replace(/\n/g, " ")
       .replace(/\r/g, " ");
     const row = [
-      t.datetime || "",
+      `"${t.datetime || ""}"`,
       t.likes || 0,
       t.retweets || 0,
       t.replies || 0,
       t.views || 0,
       t.bookmarks || 0,
+      t.id || "",
       `"${cleanText}"`,
     ];
     csvRows.push(row.join(","));
@@ -142,8 +159,3 @@ function downloadTweets() {
 
   console.log(`${tweets.length}件のツイートをJSONでダウンロードしました`);
 }
-
-// 使用方法：
-// tweets.length - 収集済み件数確認
-// downloadTweets() - JSONでダウンロード
-// downloadTweetsCSV() - CSVでダウンロード
