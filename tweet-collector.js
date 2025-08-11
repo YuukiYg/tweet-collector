@@ -1,3 +1,8 @@
+// 設定: 特定のアカウントのみを収集したい場合はここにユーザーIDを設定
+// 例: const TARGET_USER_ID = 'YuukiYg'; // 特定のアカウントのみ
+// 全てのアカウントを収集する場合は null のまま
+const TARGET_USER_ID = null;
+
 // 収集済みツイートのIDを追跡
 const collectedTweetIds = new Set();
 const tweets = [];
@@ -10,6 +15,19 @@ function extractTweetData(node) {
   const tweetId = tweetLink.href.match(/\/status\/(\d+)/)?.[1];
   if (!tweetId || collectedTweetIds.has(tweetId)) return null;
 
+  // アカウントIDを取得してフィルタリング
+  const userLink = node.querySelector('a[href^="/"]:not([href*="/status/"])');
+  let userId = "";
+  if (userLink) {
+    const href = userLink.getAttribute("href");
+    userId = href.replace("/", "").split("/")[0];
+  }
+
+  // TARGET_USER_IDが指定されている場合はそのアカウントのみ収集
+  if (TARGET_USER_ID && userId !== TARGET_USER_ID) {
+    return null;
+  }
+
   // 各種データを抽出
   const textElement = node.querySelector('[data-testid="tweetText"]');
   const timeElement = node.querySelector("time");
@@ -18,7 +36,6 @@ function extractTweetData(node) {
   const likeElement = node.querySelector('[data-testid="like"]');
   const retweetElement = node.querySelector('[data-testid="retweet"]');
   const replyElement = node.querySelector('[data-testid="reply"]');
-  const bookmarkElement = node.querySelector('[data-testid="bookmark"]');
 
   // 数値を抽出する関数
   function extractCount(element) {
@@ -34,28 +51,26 @@ function extractTweetData(node) {
     node.querySelector('a[href*="/analytics"]') ||
     node.querySelector('[data-testid="app-text-transition-container"]');
 
-  // 日本時間に変換
+  // 日本時間をYYYY-MM-DD HH:mm:ss形式に変換
   let japanTime = "";
   if (timeElement?.getAttribute("datetime")) {
     const date = new Date(timeElement.getAttribute("datetime"));
-    japanTime = date.toLocaleString("ja-JP", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    const second = String(date.getSeconds()).padStart(2, "0");
+    japanTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   }
 
   return {
     datetime: japanTime,
+    userId: userId,
     likes: extractCount(likeElement),
     retweets: extractCount(retweetElement),
     replies: extractCount(replyElement),
     views: extractCount(viewElement) || 0,
-    bookmarks: extractCount(bookmarkElement),
     id: tweetId,
     text: textElement?.innerText || "",
     url: tweetLink.href,
@@ -71,8 +86,9 @@ const observer = new MutationObserver((mutations) => {
         if (tweetData) {
           tweets.push(tweetData);
           collectedTweetIds.add(tweetData.id);
-          console.log(`新しい投稿 (${tweets.length}件目): ${tweetData.likes}♥ ${tweetData.retweets}🔄 ${tweetData.replies}💬
-  ${tweetData.bookmarks}🔖`);
+          console.log(
+            `新しい投稿 (${tweets.length}件目) @${tweetData.userId}: ${tweetData.likes}♥ ${tweetData.retweets}🔄 ${tweetData.replies}💬`
+          );
         }
       }
     });
@@ -91,11 +107,11 @@ function downloadTweetsCSV() {
 
   const headers = [
     "投稿日時",
+    "ユーザーID",
     "いいね数",
     "リツイート数",
     "リプ数",
     "インプ数",
-    "ブックマーク数",
     "ID",
     "投稿内容",
   ];
@@ -107,12 +123,12 @@ function downloadTweetsCSV() {
       .replace(/\n/g, " ")
       .replace(/\r/g, " ");
     const row = [
-      `"${t.datetime || ""}"`,
+      t.datetime || "",
+      t.userId || "",
       t.likes || 0,
       t.retweets || 0,
       t.replies || 0,
       t.views || 0,
-      t.bookmarks || 0,
       t.id || "",
       `"${cleanText}"`,
     ];
@@ -120,7 +136,7 @@ function downloadTweetsCSV() {
   });
 
   const csvContent = csvRows.join("\n");
-  const BOM = "\uFEFF"; // UTF-8 BOM for Excel compatibility
+  const BOM = "\uFEFF";
   const dataBlob = new Blob([BOM + csvContent], {
     type: "text/csv;charset=utf-8;",
   });
@@ -128,7 +144,10 @@ function downloadTweetsCSV() {
   const url = URL.createObjectURL(dataBlob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `iiGIANT_tweets_${new Date().toISOString().slice(0, 10)}.csv`;
+  const fileName = TARGET_USER_ID
+    ? `${TARGET_USER_ID}_tweets_${new Date().toISOString().slice(0, 10)}.csv`
+    : `all_tweets_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -138,7 +157,7 @@ function downloadTweetsCSV() {
 }
 
 // JSONファイルとしてダウンロード
-function downloadTweets() {
+function downloadTweetsJSON() {
   if (tweets.length === 0) {
     console.log("ダウンロードするデータがありません");
     return;
@@ -149,9 +168,10 @@ function downloadTweets() {
   const url = URL.createObjectURL(dataBlob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `iiGIANT_tweets_${new Date()
-    .toISOString()
-    .slice(0, 10)}.json`;
+  const fileName = TARGET_USER_ID
+    ? `${TARGET_USER_ID}_tweets_${new Date().toISOString().slice(0, 10)}.json`
+    : `all_tweets_${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -159,3 +179,7 @@ function downloadTweets() {
 
   console.log(`${tweets.length}件のツイートをJSONでダウンロードしました`);
 }
+
+console.log(
+  `収集モード: ${TARGET_USER_ID ? `@${TARGET_USER_ID}のみ` : "全アカウント"}`
+);
