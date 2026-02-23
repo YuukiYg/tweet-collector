@@ -1,7 +1,7 @@
 // 設定: 特定のアカウントのみを収集したい場合はここにユーザーIDを設定
 // 例: const TARGET_USER_ID = 'YuukiYg'; // 特定のアカウントのみ
 // 全てのアカウントを収集する場合は null のまま
-const TARGET_USER_ID = null;
+const TARGET_USER_ID = 'id';
 
 // 収集済みツイートのIDを追跡
 const collectedTweetIds = new Set();
@@ -64,6 +64,44 @@ function extractTweetData(node) {
     japanTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   }
 
+  // 返信先ユーザーを取得
+  const replyingTo = node.querySelector('[data-testid="replyingTo"]');
+  let replyToWho = "";
+  if (replyingTo) {
+    const replyText = replyingTo.textContent;
+    const match = replyText.match(/@(\w+)/);
+    replyToWho = match ? match[1] : "";
+  }
+
+  // 返信先ツイートIDを取得（HTMLからは直接取得不可なので空文字）
+  const replyToWhichId = "";
+
+  // メディアの有無を判定
+  const hasMedia = node.querySelector('[data-testid="tweetPhoto"]') ||
+                   node.querySelector('[data-testid="videoPlayer"]') ||
+                   node.querySelector('video') ? 1 : 0;
+
+  // 引用ツイートの情報を取得
+  let repostToWho = "";
+  let repostToWhichId = "";
+
+  // 「引用」というテキストを探す
+  const allText = node.innerText || "";
+  if (allText.includes("引用")) {
+    // 引用ツイート内のリンクを探す
+    const links = node.querySelectorAll('a[href*="/status/"]');
+    for (const link of links) {
+      const href = link.getAttribute("href");
+      const match = href.match(/^\/([^/]+)\/status\/(\d+)/);
+      // 自分のツイートIDと異なるものを引用先として判定
+      if (match && match[2] !== tweetId) {
+        repostToWho = match[1];
+        repostToWhichId = match[2];
+        break;
+      }
+    }
+  }
+
   return {
     datetime: japanTime,
     userId: userId,
@@ -72,6 +110,11 @@ function extractTweetData(node) {
     replies: extractCount(replyElement),
     views: extractCount(viewElement) || 0,
     id: tweetId,
+    replyToWho: replyToWho,
+    replyToWhichId: replyToWhichId,
+    hasMedia: hasMedia,
+    repostToWho: repostToWho,
+    repostToWhichId: repostToWhichId,
     text: textElement?.innerText || "",
     url: tweetLink.href,
     timestamp: new Date().toISOString(),
@@ -113,6 +156,11 @@ function downloadTweetsCSV() {
     "リプ数",
     "インプ数",
     "ID",
+    "replyToWho",
+    "replyToWhichId",
+    "hasMedia",
+    "repostToWho",
+    "repostToWhichId",
     "投稿内容",
   ];
   const csvRows = [headers.join(",")];
@@ -130,6 +178,11 @@ function downloadTweetsCSV() {
       t.replies || 0,
       t.views || 0,
       t.id || "",
+      t.replyToWho || "",
+      t.replyToWhichId || "",
+      t.hasMedia || 0,
+      t.repostToWho || "",
+      t.repostToWhichId || "",
       `"${cleanText}"`,
     ];
     csvRows.push(row.join(","));

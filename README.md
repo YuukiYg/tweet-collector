@@ -21,6 +21,11 @@
 - リプライ数
 - インプレッション数（表示回数）
 - ツイート ID
+- **返信先ユーザー名** (replyToWho)
+- **返信先ツイートID** (replyToWhichId) ※HTMLから取得不可のため空文字
+- **メディア有無** (hasMedia) - 画像・動画の有無を 1/0 で表示
+- **引用元ユーザー名** (repostToWho)
+- **引用元ツイートID** (repostToWhichId)
 - 投稿内容
 
 ## 使用方法
@@ -107,8 +112,10 @@ content.js にメインのJavaScriptコードを配置。
 
 CSV形式
 
-投稿日時,ユーザーID,いいね数,リツイート数,リプ数,インプ数,ID,投稿内容
-2024-08-11 14:30:25,YuukiYg,150,25,10,5000,1234567890,"サンプル投稿内容"
+投稿日時,ユーザーID,いいね数,リツイート数,リプ数,インプ数,ID,replyToWho,replyToWhichId,hasMedia,repostToWho,repostToWhichId,投稿内容
+2024-08-11 14:30:25,YuukiYg,150,25,10,5000,1111111111111111111,,,0,,,"オリジナル投稿のサンプル"
+2024-08-11 15:20:10,user_a,200,30,5,8000,2222222222222222222,YuukiYg,,0,,,"YuukiYgへの返信"
+2024-08-11 16:10:30,user_b,100,15,2,3000,3333333333333333333,,,1,YuukiYg,1111111111111111111,"引用ツイート（画像付き）"
 
 JSON形式
 
@@ -120,8 +127,32 @@ JSON形式
     "retweets": 25,
     "replies": 10,
     "views": 5000,
-    "id": "1234567890",
-    "text": "サンプル投稿内容",
+    "id": "1111111111111111111",
+    "replyToWho": "",
+    "replyToWhichId": "",
+    "hasMedia": 0,
+    "repostToWho": "",
+    "repostToWhichId": "",
+    "text": "オリジナル投稿のサンプル",
+    "url": "https://x.com/YuukiYg/status/1111111111111111111",
+    "timestamp": "2024-08-11T05:30:25.000Z"
+  },
+  {
+    "datetime": "2024-08-11 15:20:10",
+    "userId": "user_a",
+    "likes": 200,
+    "retweets": 30,
+    "replies": 5,
+    "views": 8000,
+    "id": "2222222222222222222",
+    "replyToWho": "YuukiYg",
+    "replyToWhichId": "",
+    "hasMedia": 0,
+    "repostToWho": "",
+    "repostToWhichId": "",
+    "text": "YuukiYgへの返信",
+    "url": "https://x.com/user_a/status/2222222222222222222",
+    "timestamp": "2024-08-11T06:20:10.000Z"
   }
 ]
 
@@ -132,6 +163,8 @@ JSON形式
 - ブックマーク数は取得不可（Twitter仕様により非公開）
 - 全投稿の取得は不可（APIの制限により数千件程度が上限）
 - リアルタイム取得のみ（過去の投稿は表示された分のみ）
+- **返信先ツイートID (replyToWhichId) は取得不可**（Twitter/XはHTMLにこの情報を出力していません）
+- 引用ツイートの検出は「引用」というテキストに依存（英語環境では動作しない可能性があります）
 
 使用上の注意
 
