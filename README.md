@@ -48,8 +48,37 @@ downloadTweetsCSV()
 
 // JSONでダウンロード
 downloadTweetsJSON()
+```
 
-2. 特定アカウントのみを収集
+### 2. 複数のCSVファイルを結合
+
+`merge_tweets.py` を使って、複数回に分けて収集したCSVファイルを1つに結合できます。
+
+```bash
+# 使い方
+python merge_tweets.py <フォルダパス>
+
+# 例: カレントディレクトリのCSVファイルを結合
+python merge_tweets.py .
+
+# 例: 特定フォルダのCSVファイルを結合
+python merge_tweets.py ~/Documents/tweets
+```
+
+**機能:**
+- 指定フォルダ内の全CSVファイルを自動検出・結合
+- ツイートID（ID列）で重複を自動削除
+- 投稿日時順にソート（新しい順）
+- 出力ファイル名: `{TARGET_USER_ID}_merged_tweets_YYYY-MM-DD.csv`
+  - アカウントIDはファイル名から自動検出
+  - 検出できない場合は `merged_tweets_YYYY-MM-DD.csv`
+
+**必要なライブラリ:**
+```bash
+pip install pandas
+```
+
+### 3. 特定アカウントのみを収集
 
 コードの上部にある TARGET_USER_ID を設定：
 
@@ -58,8 +87,9 @@ const TARGET_USER_ID = 'YuukiYg';
 
 // 全アカウント収集（デフォルト）
 const TARGET_USER_ID = null;
+```
 
-3. ブラウザ拡張機能として使用
+### 4. ブラウザ拡張機能として使用
 
 manifest.json:
 {
@@ -75,7 +105,9 @@ manifest.json:
 
 content.js にメインのJavaScriptコードを配置。
 
-4. Tampermonkey/Greasemonkey
+### 5. Tampermonkey/Greasemonkey
+
+```javascript
 
 // ==UserScript==
 // @name         Twitter Data Collector
@@ -90,17 +122,25 @@ content.js にメインのJavaScriptコードを配置。
     'use strict';
     // メインのJavaScriptコードをここに貼り付け
 })();
+```
 
-技術仕様
+## 技術仕様
 
-主要な技術
+### 主要な技術
 
+**tweet-collector.js:**
 - MutationObserver API: DOM変更の監視
 - querySelector: HTML要素の取得
 - Blob API: ファイルデータの生成
 - URL.createObjectURL: ダウンロードリンクの生成
 
-動作原理
+**merge_tweets.py:**
+- pandas: データフレーム操作・CSV処理
+- glob: ファイルパターンマッチング
+
+### 動作原理
+
+**tweet-collector.js:**
 
 1. MutationObserverでタイムラインのDOM変更を監視
 2. 新しいツイート要素が追加されると自動で検出
@@ -108,16 +148,28 @@ content.js にメインのJavaScriptコードを配置。
 4. 重複チェック後、配列に保存
 5. ユーザーの要求でCSV/JSON形式でダウンロード
 
-出力形式
+**merge_tweets.py:**
+1. 指定フォルダ内の全CSVファイルを検索
+2. 各CSVファイルを読み込み、1つのDataFrameに結合
+3. ツイートID（ID列）で重複を削除
+4. 投稿日時順にソート
+5. ファイル名からアカウントIDを抽出し、出力ファイル名に反映
 
-CSV形式
+## 出力形式
+
+### CSV形式
+
+```csv
 
 投稿日時,ユーザーID,いいね数,リツイート数,リプ数,インプ数,ID,replyToWho,replyToWhichId,hasMedia,repostToWho,repostToWhichId,投稿内容
 2024-08-11 14:30:25,YuukiYg,150,25,10,5000,1111111111111111111,,,0,,,"オリジナル投稿のサンプル"
 2024-08-11 15:20:10,user_a,200,30,5,8000,2222222222222222222,YuukiYg,,0,,,"YuukiYgへの返信"
 2024-08-11 16:10:30,user_b,100,15,2,3000,3333333333333333333,,,1,YuukiYg,1111111111111111111,"引用ツイート（画像付き）"
+```
 
-JSON形式
+### JSON形式
+
+```json
 
 [
   {
@@ -155,10 +207,11 @@ JSON形式
     "timestamp": "2024-08-11T06:20:10.000Z"
   }
 ]
+```
 
-注意事項
+## 注意事項
 
-制限事項
+### 制限事項
 
 - ブックマーク数は取得不可（Twitter仕様により非公開）
 - 全投稿の取得は不可（APIの制限により数千件程度が上限）
@@ -166,28 +219,23 @@ JSON形式
 - **返信先ツイートID (replyToWhichId) は取得不可**（Twitter/XはHTMLにこの情報を出力していません）
 - 引用ツイートの検出は「引用」というテキストに依存（英語環境では動作しない可能性があります）
 
-使用上の注意
+### 使用上の注意
 
 - Twitter/Xの利用規約を遵守してください
 - 大量データ収集時はサーバー負荷を考慮し、適度な間隔を空けてください
 - 収集したデータの取り扱いには十分注意してください
 - 個人情報保護法等の関連法令を遵守してください
 
-トラブルシューティング
+## トラブルシューティング
 
-データが収集されない場合
+### データが収集されない場合
 
 1. 開発者ツールのコンソールでエラーが出ていないか確認
 2. Twitter/XのUI変更により要素のセレクタが変わった可能性
 3. ブラウザの設定でJavaScriptが無効になっていないか確認
 
-ダウンロードできない場合
+### ダウンロードできない場合
 
 1. ブラウザのダウンロードブロック設定を確認
 2. tweets.lengthで収集データがあるか確認
 3. ポップアップブロッカーの設定を確認
-
-ライセンス
-
-このツールは教育・研究目的での使用を想定しています。商用利用や大量データ収集を行う場合は、Twitter APIの利用を検討してください。
-```
